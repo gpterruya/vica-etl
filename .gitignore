@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Dados de adoções/adotantes (pessoais) e artefatos locais
+*.csv
+*.jsonl
+*.pdf
+*.tgz
+*.yaml
+gcloud

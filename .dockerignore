@@ -1,0 +1,17 @@
+.git
+.gitignore
+.gcloudignore
+.dockerignore
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Dados de adoções/adotantes (pessoais) e artefatos locais: nunca copiar para a imagem
+*.csv
+*.jsonl
+*.pdf
+*.tgz
+*.yaml
+gcloud

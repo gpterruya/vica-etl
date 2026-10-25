@@ -1,0 +1,16 @@
+.gcloudignore
+.git
+.gitignore
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Dados de adoções/adotantes (pessoais) e artefatos locais: nunca enviar ao Cloud Build
+*.csv
+*.jsonl
+*.pdf
+*.tgz
+*.yaml
+gcloud
