@@ -30,3 +30,6 @@ tests/
 scripts/
 requirements-dev.txt
 .pytest_cache/
+
+# Credencial temporária gerada pela autenticação do GitHub Actions
+gha-creds-*.json
