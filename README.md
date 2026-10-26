@@ -49,7 +49,10 @@ O CSV e os backups contêm dados de adotantes (CPF, RG, e-mail, telefone, endere
 - **Nunca** coloque CSV, JSONL, PDF ou tarballs no repositório ou na imagem. `.gitignore`, `.gcloudignore` e `.dockerignore` já excluem esses arquivos; antes de um build, confira com `gcloud meta list-files-for-upload`.
 - Em testes, imprima só contagens e nomes de colunas, nunca valores ou tokens.
 - No Looker Studio, remova da fonte de dados os campos pessoais que o painel não usa e compartilhe o relatório só com quem precisa.
-- Os backups brutos se acumulam em `gs://vica-dashboard/backups/` (um por dia). Considere uma regra de ciclo de vida no bucket para apagá-los depois de um prazo.
+- Os backups brutos em `gs://vica-dashboard/backups/zapsign_raw_*` (um por execução, cerca de 106 MB cada) são apagados após 30 dias pela regra de ciclo de vida em `gcs/lifecycle-vica-dashboard.json`. Com o soft delete do bucket, ainda podem ser recuperados por mais 7 dias. A regra substitui toda a configuração de ciclo de vida do bucket; para alterá-la, edite o arquivo e aplique:
+  ```bash
+  gcloud storage buckets update gs://vica-dashboard --lifecycle-file=gcs/lifecycle-vica-dashboard.json
+  ```
 
 ## Rodar e testar localmente
 

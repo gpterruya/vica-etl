@@ -20,3 +20,6 @@ monitoring/
 
 # Documentação
 *.md
+
+# Configuração de buckets (não faz parte da imagem)
+gcs/
