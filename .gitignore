@@ -11,3 +11,4 @@ venv/
 *.tgz
 *.yaml
 gcloud
+.pytest_cache/

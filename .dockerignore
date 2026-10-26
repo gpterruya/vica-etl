@@ -24,3 +24,10 @@ monitoring/
 
 # Configuração de buckets (não faz parte da imagem)
 gcs/
+
+# CI/CD e testes (não fazem parte da imagem)
+.github/
+tests/
+scripts/
+requirements-dev.txt
+.pytest_cache/

@@ -64,7 +64,36 @@ Para testar transformações sem rede, use a imagem com `--network none` e chame
 docker run --rm --network none --entrypoint python <imagem> -c "import pandas as pd; from transform.pipeline import transform; print(transform(pd.DataFrame([{'nome do animal': 'Rex'}])))"
 ```
 
-## Publicar uma nova versão
+## Testes
+
+Testes com dados sintéticos e API/Storage simulados (nunca acessam a rede):
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+```bash
+pytest -v
+```
+
+## CI/CD (GitHub Actions)
+
+- **CI** (`.github/workflows/ci.yml`): em todo pull request e push no `main`, roda os testes, constrói a imagem e confere com `scripts/check-image.sh` que `/app` não tem dados e que as bibliotecas batem com o `requirements.txt`.
+- **Deploy** (`.github/workflows/deploy.yml`): ao criar uma tag `vN` num commit do `main`, roda o CI, constrói e confere a imagem, envia para o Artifact Registry como `etl-zapsign-job:vN` e aponta o Job para ela pelo digest. Não executa o ETL; a execução das 3h já usa a versão nova. O resumo do workflow mostra a imagem anterior e o comando de rollback.
+
+Para lançar uma versão:
+
+```bash
+git tag v8
+```
+
+```bash
+git push origin v8
+```
+
+O GitHub Actions autentica no GCP sem chave, pela federação de identidade (`workloadIdentityPools/github`, provedor `vica-etl`, que só aceita tags `v*` deste repositório), com a conta `vica-etl-deployer`. Ela só pode enviar imagens para `cloud-run-source-deploy` e atualizar o `etl-zapsign-job`.
+
+## Publicação manual (alternativa ao CI/CD)
 
 1. Confira o que vai ser enviado (só código):
    ```bash

@@ -1,0 +1,113 @@
+name: Deploy
+
+# Publica uma versão ao criar uma tag vN (ex.: v8) num commit do main.
+# Constrói a imagem, confere, envia ao Artifact Registry e aponta o
+# Cloud Run Job para ela pelo digest. Não executa o ETL: a próxima
+# execução agendada (3h) já usa a imagem nova.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: petin-418419
+  CLOUDSDK_CORE_PROJECT: petin-418419
+  REGION: southamerica-east1
+  JOB_NAME: etl-zapsign-job
+  IMAGE: southamerica-east1-docker.pkg.dev/petin-418419/cloud-run-source-deploy/etl-zapsign-job
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy no Cloud Run Job
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check tag is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::A tag ${GITHUB_REF_NAME} não aponta para um commit do main."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/128526737588/locations/global/workloadIdentityPools/github/providers/vica-etl
+          service_account: vica-etl-deployer@petin-418419.iam.gserviceaccount.com
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Check tag is not published yet
+        run: |
+          if gcloud artifacts docker images describe "${IMAGE}:${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "::error::A imagem ${IMAGE}:${GITHUB_REF_NAME} já existe. Use uma tag nova."
+            exit 1
+          fi
+
+      - name: Build
+        run: docker build -t "${IMAGE}:${GITHUB_REF_NAME}" .
+
+      - name: Check image
+        run: bash scripts/check-image.sh "${IMAGE}:${GITHUB_REF_NAME}"
+
+      - name: Push
+        id: push
+        run: |
+          docker push "${IMAGE}:${GITHUB_REF_NAME}"
+          ref=$(docker image inspect "${IMAGE}:${GITHUB_REF_NAME}" --format '{{index .RepoDigests 0}}')
+          echo "image_ref=${ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Cloud Run Job
+        id: update
+        run: |
+          previous=$(gcloud run jobs describe "$JOB_NAME" --region="$REGION" \
+            --format="value(spec.template.spec.template.spec.containers[0].image)")
+          echo "previous=${previous}" >> "$GITHUB_OUTPUT"
+
+          gcloud run jobs update "$JOB_NAME" --region="$REGION" \
+            --image="${{ steps.push.outputs.image_ref }}"
+
+          current=$(gcloud run jobs describe "$JOB_NAME" --region="$REGION" \
+            --format="value(spec.template.spec.template.spec.containers[0].image)")
+          if [ "$current" != "${{ steps.push.outputs.image_ref }}" ]; then
+            echo "::error::O Job não ficou com a imagem esperada: ${current}"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deploy ${GITHUB_REF_NAME}"
+            echo ""
+            echo "- Imagem nova: \`${{ steps.push.outputs.image_ref }}\`"
+            echo "- Imagem anterior (rollback): \`${{ steps.update.outputs.previous }}\`"
+            echo ""
+            echo "Rollback:"
+            echo '```'
+            echo "gcloud run jobs update ${JOB_NAME} --region=${REGION} --project=${PROJECT_ID} --image=${{ steps.update.outputs.previous }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
