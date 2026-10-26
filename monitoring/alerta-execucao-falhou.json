@@ -1,0 +1,32 @@
+{
+  "displayName": "ETL ZapSign: execução do Job falhou",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Execução do etl-zapsign-job terminou com falha",
+      "conditionThreshold": {
+        "filter": "resource.type = \"cloud_run_job\" AND resource.labels.job_name = \"etl-zapsign-job\" AND metric.type = \"run.googleapis.com/job/completed_execution_count\" AND metric.labels.result = \"failed\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "600s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "86400s"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Uma execução do Cloud Run Job `etl-zapsign-job` falhou (erro ou tempo limite de 4h). O CSV `gs://vica-dashboard/adocoes-teste.csv` provavelmente continua com os dados do dia anterior.\n\nVer execuções: `gcloud run jobs executions list --job=etl-zapsign-job --region=southamerica-east1 --project=petin-418419`"
+  }
+}

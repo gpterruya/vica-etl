@@ -1,0 +1,22 @@
+{
+  "displayName": "ETL ZapSign: agendamento não conseguiu disparar o Job",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Erro no Cloud Scheduler etl-zapsign-diario",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_scheduler_job\" AND resource.labels.job_id=\"etl-zapsign-diario\" AND severity>=ERROR"
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "O agendamento `etl-zapsign-diario` não conseguiu iniciar o `etl-zapsign-job` (por exemplo, permissão da conta `etl-scheduler` ou Job inexistente). Nenhuma execução rodou e o CSV não foi atualizado.\n\nVer estado: `gcloud scheduler jobs describe etl-zapsign-diario --location=southamerica-east1 --project=petin-418419`"
+  }
+}

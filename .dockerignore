@@ -15,3 +15,6 @@ venv/
 *.tgz
 *.yaml
 gcloud
+
+# Configuração de alertas (não faz parte da imagem)
+monitoring/
