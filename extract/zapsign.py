@@ -2,7 +2,13 @@ import os
 import requests
 import pandas as pd
 from dotenv import load_dotenv
-from tenacity import retry, stop_after_attempt, wait_fixed
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 import logging
 from config import BASE_URL, ZAPSIGN_TOKEN
 
@@ -21,17 +27,42 @@ HEADERS = {
 
 # ---------------- API ---------------- #
 
-@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
+REQUEST_TIMEOUT = 60  # segundos por chamada
+
+# Status que indicam instabilidade temporária da API (vale tentar de novo)
+TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+
+
+def is_transient_error(exc):
+    if isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+        return True
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        return exc.response.status_code in TRANSIENT_STATUS
+    return False
+
+
+# Até 8 tentativas com espera crescente (2s, 4s, 8s... até 60s): cerca de
+# 3 minutos no total. Outros erros (ex.: 401 token inválido) falham na hora.
+api_retry = retry(
+    retry=retry_if_exception(is_transient_error),
+    stop=stop_after_attempt(8),
+    wait=wait_exponential(multiplier=2, min=2, max=60),
+    before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING),
+    reraise=True,
+)
+
+
+@api_retry
 def get_docs_page(url):
-    response = requests.get(url, headers=HEADERS)
+    response = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
+@api_retry
 def get_doc_detail(token):
     url = f"{BASE_URL}/docs/{token}/"
-    response = requests.get(url, headers=HEADERS)
+    response = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
 

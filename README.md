@@ -11,7 +11,7 @@ ZapSign API ──► extract ──► backup bruto (JSONL) ──► transform
 
 | Etapa | Código | O que faz |
 |---|---|---|
-| Extração | `extract/zapsign.py` | Pagina `GET /docs/` e busca o detalhe de cada documento (`GET /docs/{token}/`), com 3 tentativas por chamada. Cada resposta de formulário (`answers`) vira uma coluna, com o nome da variável em minúsculas. Respostas sem variável (nula, vazia ou só espaços) vão para `resposta_sem_variavel`. |
+| Extração | `extract/zapsign.py` | Pagina `GET /docs/` e busca o detalhe de cada documento (`GET /docs/{token}/`). Cada chamada tem tempo limite de 60 s e, em erros temporários (429, 500, 502, 503, 504, falha de conexão ou timeout), até 8 tentativas com espera crescente de 2 s a 60 s (cerca de 3 minutos no total); outros erros, como 401, falham na hora. Cada resposta de formulário (`answers`) vira uma coluna, com o nome da variável em minúsculas. Respostas sem variável (nula, vazia ou só espaços) vão para `resposta_sem_variavel`. |
 | Backup bruto | `load/storage.py` → `upload_raw_jsonl` | Salva o DataFrame extraído em `gs://vica-dashboard/backups/zapsign_raw_<timestamp>.jsonl`, um arquivo por execução. |
 | Transformação | `transform/pipeline.py` | Normaliza data de nascimento, idade, estado, cidade, bairro, data de criação, espécie, raça, porte e faixa etária (`transform/transformations/`). |
 | Publicação | `load/storage.py` → `upload_csv` | Grava o CSV (UTF-8 com BOM, separador `,`, datas `AAAA-MM-DD`) em `gs://vica-dashboard/adocoes-teste.csv`, sobrescrevendo o anterior. |
@@ -157,5 +157,6 @@ gcloud run jobs execute etl-zapsign-job --region=southamerica-east1 --project=pe
 - **Colunas dinâmicas:** as colunas vêm das variáveis dos modelos da ZapSign. Criar, renomear ou apagar uma variável num modelo adiciona ou remove colunas; no Looker Studio, use **Atualizar campos** na fonte de dados.
 - **`resposta_sem_variavel`:** guarda a primeira resposta sem variável de cada documento. Mistura respostas de perguntas diferentes.
 - **Idade e faixa etária** são calculadas com a data da execução, então mudam de um dia para o outro mesmo sem dados novos.
-- **Documentos com erro:** se o detalhe de um documento falhar depois das 3 tentativas, ele é registrado no log e fica fora do CSV daquela execução. A execução continua e termina com sucesso, então isso **não** dispara o alerta de falha.
+- **API fora do ar:** se a listagem de documentos continuar falhando depois das tentativas (cerca de 3 minutos), a execução para com erro **antes** de gravar qualquer coisa: o CSV publicado fica o do dia anterior e o alerta de falha dispara.
+- **Documentos com erro:** se o detalhe de um documento falhar depois das tentativas, ele é registrado no log e fica fora do CSV daquela execução. A execução continua e termina com sucesso, então isso **não** dispara o alerta de falha.
 - **Token repetido:** a listagem da API pode trazer o mesmo documento duas vezes; não trate `token` como chave única sem verificar.
